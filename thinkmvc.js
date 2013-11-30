@@ -989,29 +989,8 @@ TM.declare('thinkmvc.ui.Common').extend({
 
 // super controller class
 TM.declare('thinkmvc.Controller').inherit('thinkmvc.ui.Common').extend({
-  actionsDeclared: false,  
   eventSplitter: /^(\S+)\s*(.*)$/,
   undelegatableEvents: [], // some events are not delegatable via jQuery
-  
-  // for AUI declarative
-  declareActions: function() {
-    if (this.actionsDeclared || !(this.actions && A && A.declarative)) {
-      return;
-    }
-    
-    var actions = this.actions, eventSplitter = this.eventSplitter;
-    for (var key in actions) {
-      var method = actions[key];
-      if (typeof method !== 'string' || !(method in this)) {
-        throw new Error('Failed to find method ' + method);
-      }
-      
-      var match = key.match(eventSplitter); // 1: action name, 2: event name
-      A.declarative(match[1], match[2], this.proxy(this[method], method));
-    }
-    
-    this.proto('actionsDeclared', true);
-  },
   
   initEvents: function() {
     var events = this.events;
@@ -1048,7 +1027,6 @@ TM.declare('thinkmvc.Controller').inherit('thinkmvc.ui.Common').extend({
   initialize: function() {
     this.refreshElements();
     this.initEvents();
-    this.declareActions();
   }
 }); // Controller
 
