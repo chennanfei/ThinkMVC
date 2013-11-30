@@ -25,7 +25,7 @@
 }());
 
 window.TM = (function() {
-  var DEBUG_MODE = true, _pDocument = typeof document !== 'undefined' ? document : null, _pCom = {},
+  var DEBUG_MODE = true, _pCom = {},
     _pNamespaces = {}, _pfSlice = Array.prototype.slice, _pConfig,
     _excludedAttributes = ['_extend', '_self', 'constructor', 'U'];
   
