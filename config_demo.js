@@ -1,5 +1,5 @@
 TM.configure({
-  baseUrl: '',
+  baseUrl: 'https://raw.github.com/chennanfei/ThinkMVC/master/',
   
   dependencies: {
     docIndex: ['jquery', 'docData']
