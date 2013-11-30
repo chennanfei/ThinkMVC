@@ -18,31 +18,9 @@ What is the architecture?
 
 How does it work?
 1. Firstly you need load the thinkmvc.js in the html page and set an attribute 'data-page' to the body tag. This attribute tells the framework what the current page is.
-<script type="text/javascript" data-config="config.js" src="thinkmvc.js" defer></script>
-<body data-page=“gateway”>…</body>
 
 2. The framework load config.js and read it. And then load other resources which your custom code depends on.
 config.js
--------------------
-TM.configure({
-  baseUrl: '',
-  dependencies: {
-    myapp: ['data'],
-  },                                                                                                                                      
-  forceSync: false,                                                                                                                       
-  modules: {
-    data: '/gp/mcheckout/assets/javascript/data_demo.js',
-    myapp: '/gp/mcheckout/assets/javascript/appliaction_demo.js'
-  },
-
-  pages: {
-    gateway: {
-      controller: 'doc.GatewayController',
-      module: 'myapp'
-    }
-  }
-});
--------------------
 
 3. After all resources are downloaded, the framework creates the page-level controller instance for current page.
 
