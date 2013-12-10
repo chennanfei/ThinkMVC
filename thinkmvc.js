@@ -16,7 +16,7 @@
   if (!Array.prototype.forEach) {
     Array.prototype.forEach = function forEach(callback) {
       for (var i = 0; i < this.length; i++) {
-        if (callback(this[i]) === false) {
+        if (callback(this[i], i) === false) {
           return;
         }
       }
@@ -25,7 +25,7 @@
 }());
 
 window.TM = (function() {
-  var DEBUG_MODE = true, _pCom = {},
+  var DEBUG_MODE = true, _pDocument = typeof document !== 'undefined' ? document : null, _pCom = {},
     _pNamespaces = {}, _pfSlice = Array.prototype.slice, _pConfig,
     _excludedAttributes = ['_extend', '_self', 'constructor', 'U'];
   
@@ -434,10 +434,8 @@ window.TM = (function() {
       script.setAttribute('id', module);
       script.setAttribute('src', src);
       script.setAttribute('type', 'text/javascript');
-      if (!(_pConfig && _pConfig.forceSync)) {
-        script.setAttribute('async', true);
-        script.setAttribute('defer', true);
-      }
+      //script.setAttribute('async', false);
+      //script.setAttribute('defer', false);
       
       if (script.addEventListener) {
         script.addEventListener('load', handleLoadEvent);
@@ -449,20 +447,10 @@ window.TM = (function() {
     
     function getReadyResources() {
       var readyResources = [];
-      if (_pConfig.forceSync) {
-        for (var i = 0; i < sortedModules.length; i++) {
-          var module = sortedModules[i];
-          if (dependencyStatusList[module] === status.READY) {
-            readyResources.push(module);
-            setModuleStatus(module, status.PENDING);
-          }
-        }
-      } else {
-        for (var k in dependencyStatusList) {
-          if (dependencyStatusList[k] === status.READY) {
-            readyResources.push(k);
-            setModuleStatus(k, status.PENDING);
-          }
+      for (var k in dependencyStatusList) {
+        if (dependencyStatusList[k] === status.READY) {
+          readyResources.push(k);
+          setModuleStatus(k, status.PENDING);
         }
       }
       
@@ -473,7 +461,7 @@ window.TM = (function() {
       if (!id) {
         return;
       }
-      
+
       var scripts = getScripts();
       for (var i = 0; scripts && i < scripts.length; i++) {
         if (id === scripts[i].getAttribute('id')) {
@@ -484,7 +472,8 @@ window.TM = (function() {
     
     function getScripts() {
       if (!scripts) {
-        scripts = document.getElementsByTagName('script');
+        var scriptList = document.getElementsByTagName('script');
+        scripts = _pfSlice.call(scriptList, 0);
       }
       return scripts;
     }
@@ -504,9 +493,7 @@ window.TM = (function() {
         setModuleStatus(module, status.COMPLETED);
       }
       
-      if (!_pConfig.forceSync) {    
-        updateDependencyStatusList();
-      }
+      updateDependencyStatusList();
       
       if (allResourcesLoaded()) {
         _pGlobalUtil.createEntrance();
@@ -522,19 +509,18 @@ window.TM = (function() {
       }
 
       var fragment = document.createDocumentFragment();
-      for (var i = 0; i < readyResources.length; i++) {
-        var k = readyResources[i];
-        var script = createScript(_pConfig.modules[k], k);
+      readyResources.forEach(function(module) {
+        var script = createScript(_pConfig.modules[module], module);
         if (!script) {
           throw new Error('The path of loading the resource is incorrect! resource:' + k);
         }
-        setModuleStatus(k, status.PENDING);
+        setModuleStatus(module, status.PENDING);
         
         if (DEBUG_MODE) {
-          _pfOutput('Going to to load resource: ' + k);
+          _pfOutput('Going to to load resource: ' + module);
         }
         scriptParent.appendChild(script);
-      }
+      });
       scriptParent.appendChild(fragment);
     }
     
@@ -553,8 +539,7 @@ window.TM = (function() {
       
       var dependentModules = _pConfig.dependencies && _pConfig.dependencies[module];
       if (dependentModules && dependentModules.length) {
-        var state = _pConfig.forceSync ? status.READY : status.HAS_DEPENDENCIES;
-        setModuleStatus(module, state);
+        setModuleStatus(module, status.HAS_DEPENDENCIES);
         
         for (var i = 0; i < dependentModules.length; i++) {
           setDependencyStatus(dependentModules[i]);
@@ -616,39 +601,30 @@ window.TM = (function() {
         }
         setDependencyStatus(module);
       },
-      
-      restart: function() {
-        scripts = null;
-        dependencyStatusList = [];
-        scriptParent = null;
-        this.start();
-      },
-      
+
       start: function() {
-        var scriptList = getScripts();
-        for (var i = 0; i < scriptList.length; i++) {
-          var script = scriptList[i];
+        getScripts().forEach(function(script) {
           if (!scriptParent) {
             scriptParent = script.parentNode;
           }
-          
+
           var configUrl = script.getAttribute('data-config');
           if (!configUrl) {
-            continue;
+            return;
           }
-          
+
           var script = getScript('config');
           if (script) {
             //script.onload();
           } else {
             scriptParent.appendChild(createScript(configUrl, 'config'));
           }
-          break;
-        }
+          return false;
+        });
       }
     };
   }()); // _pResourceLoader
-  
+
   // Engine starts
   (function() {
     setTimeout(function() {
@@ -675,7 +651,17 @@ TM.declare('thinkmvc.Base').extend({
   },
   
   destroy: function() {
-    this.proxiedCallbacks = null;
+    var proxiedCallbacks = this._proxiedCallbacks;
+    if (!proxiedCallbacks) {
+      return;
+    }
+    
+    var destroyFlag = { removeReferenceForGC: true };
+    for (var name in proxiedCallbacks) {
+      proxiedCallbacks[name].call(null, destroyFlag);
+      proxiedCallbacks[name] = null;
+    }
+    this._proxiedCallbacks = null;
   },
   
   isInstanceOf: function(klass) {
@@ -711,14 +697,14 @@ TM.declare('thinkmvc.Base').extend({
       throw new Error('Callback name is not assigned.');
     }
     
-    var callbacks = this._proxiedCallbacks || (this._proxiedCallbacks = {});
-    if (!callbacks[name]) {
-      var self = this;
-      callbacks[name] = function() {
-        return callback.apply(self, arguments);
-      };
-    }
-    return callbacks[name];
+    var self = this, callbacks = self._proxiedCallbacks || (self._proxiedCallbacks = {});
+    return callbacks[name] || (callbacks[name] = function() {
+      // release the reference 'self' to the object so that GC can recycle it.
+      if (arguments.length && arguments[0].removeReferenceForGC) {
+        return self = null;
+      }
+      return callback.apply(self, arguments);
+    });
   },
   
   // set/get an attribute to constructor's propotype
@@ -758,8 +744,9 @@ TM.declare('thinkmvc.Base').extend({
       return;
     }
     
-    if (funcName in _super && _super[funcName] instanceof Function) {
-      _super[funcName].apply(this, Array.prototype.slice.call(arguments, 1));
+    var func = _super[funcName];
+    if (func && func instanceof Function) {
+      func.apply(this, Array.prototype.slice.call(arguments, 1));
     } else {
       throw new Error('Function ' + funcName + ' was not found.');
     }
@@ -823,40 +810,43 @@ TM.declare('thinkmvc.evt.Event').extend({
 
 // class: EventManager
 TM.declare('thinkmvc.evt.EventManager').extend({
-    off: function(name, callback) {
-      var events = this._events;
-      if (!events) {
-        return this;
-      }
-      
-      if (!name) {
-        this._events = null;
-      } else if (name in events) {
-        events[name].remove(callback);
-      }
-      return this;
-    },
-    
-    on: function(name, callback) {
-      var events = this._events || (this._events = {});
-      if (!events[name]) {
-        events[name] = this.U.createInstance('thinkmvc.evt.Event', name);
-      }
-      events[name].push(callback);
-      return this;
-    },
-    
-    trigger: function(name, data) {
-      var events = this._events;
-      if (events && (name in events)) {
-        events[name].execute(this, data);
-      }
+  off: function(name, callback) {
+    var events = this._events;
+    if (!events) {
       return this;
     }
+    
+    if (!name) {
+      this._events = null;
+    } else if (name in events) {
+      events[name].remove(callback);
+    }
+    return this;
+  },
+  
+  on: function(name, callback) {
+    var events = this._events || (this._events = {});
+    if (!events[name]) {
+      events[name] = this.U.createInstance('thinkmvc.evt.Event', name);
+    }
+    events[name].push(callback);
+    return this;
+  },
+  
+  trigger: function(name, data) {
+    var events = this._events;
+    if (events && (name in events)) {
+      events[name].execute(this, data);
+    }
+    return this;
+  }
 }); // EventManager
 
 // super model class
 TM.declare('thinkmvc.Model').inherit('thinkmvc.evt.EventManager').extend({
+  attributes: [],
+  vewPath: '',
+  
   change: function() {
     return this.trigger('change');
   },
@@ -870,8 +860,9 @@ TM.declare('thinkmvc.Model').inherit('thinkmvc.evt.EventManager').extend({
   },
   
   initialize: function() {
-    if (this.viewPath) {
-      this._view = this.U.createInstance(this.viewPath, this);
+    var viewPath = this.viewPath;
+    if (viewPath) {
+      this._view = this.U.createInstance(viewPath, this);
     }
   }
 }); // Model
@@ -879,7 +870,7 @@ TM.declare('thinkmvc.Model').inherit('thinkmvc.evt.EventManager').extend({
 TM.declare('thinkmvc.Collection').inherit('thinkmvc.evt.EventManager').extend({
   add: function() {
     var Model = this._Model || (this._Model = this.U.getClass(this.modelPath));
-    var instance = this._Model.createInstance.apply(Model, arguments);
+    var instance = Model.createInstance.apply(Model, arguments);
     this._models.push(instance);
     
     return this.trigger('add', instance);
@@ -894,19 +885,26 @@ TM.declare('thinkmvc.Collection').inherit('thinkmvc.evt.EventManager').extend({
     return this.trigger('change');
   },
   
-  destroy: function() {
+  destroy: function(destroyAll) {
+    if (destroyAll !== false) {
+      this.each(function(model) {
+        model.destroy();
+      });
+    }
     this._models = null;
     this._view = null;
     this.trigger('destroy').off();
   },
+
   
   each: function(callback) {
     if (!callback || this.isEmpty()) {
       return;
     }
-    
-    for (var i = 0; i < this.size(); i++) {
-      callback(this.get(i));
+
+    var models = this._models, size = this._models.length;
+    for (var i = 0; i < size; i++) {
+      callback(models[i], i);
     }
   },
   
@@ -928,7 +926,7 @@ TM.declare('thinkmvc.Collection').inherit('thinkmvc.evt.EventManager').extend({
   },
   
   isEmpty: function() {
-    return this.size() > 0 ? false : true;
+    return this.size() <= 0 ? true: false;
   },
   
   last: function() {
@@ -952,7 +950,8 @@ TM.declare('thinkmvc.Collection').inherit('thinkmvc.evt.EventManager').extend({
   },
   
   size: function() {
-    return this._models.length;
+    var models = this._models;
+    return models ? models.length : 0;
   }
 });
 
@@ -991,7 +990,7 @@ TM.declare('thinkmvc.ui.Common').extend({
 TM.declare('thinkmvc.Controller').inherit('thinkmvc.ui.Common').extend({
   eventSplitter: /^(\S+)\s*(.*)$/,
   undelegatableEvents: [], // some events are not delegatable via jQuery
-  
+
   initEvents: function() {
     var events = this.events;
     if (!events) {
