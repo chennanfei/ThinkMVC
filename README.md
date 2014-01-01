@@ -4,15 +4,25 @@ ThinkMVC
 ThinkMVC is a javascript MVC framework. It follows the AMD rule, namely you don't care about the order of defining classes. Also the framework defines the single entrance of executing your custom javascript code.
 
 What is the architecture?
+
 1. The core part can do: construct a "class", allow a class to inherit from the other one, download resources asynchronously, provide a single entrance of executing the custom code.
+
 2. Base on core part, it provides such classes: Base, Event, EventManager, ui.Common, Controller, View, Model, Collection.
+
 (1) Base: the super class of all other custom classes
+
 (2) Event: custom event class
+
 (3) EventManager: manage events
+
 (4) Model: it inherits from EventManager. it is supposed to contain business logic.
+
 (5) Collection: a set of Model. It also inherits from EventManager
+
 (6) ui.Common: it provides some  common APIs related to DOM
+
 (7) Controller: it responses customer requests from client and decides which model should handle requests
+
 (8) View: it listens to the model events and updates UI
 
 
