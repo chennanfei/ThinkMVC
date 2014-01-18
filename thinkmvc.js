@@ -273,24 +273,24 @@ window.TM = (function() {
             throw new Error('Parent class is invalid');
           }
           
-          var ref = freshClass, className = ref.className, emptyFunc = function() {};
-          emptyFunc.prototype = parentClass.prototype;
+          var ref = freshClass,
+            CFunc = function() {
+              parentClass.apply(this, arguments); // this has parent's properties
+              ref.apply(this, arguments); // append customer defined properties
+            };
 
-          var CFunc = function() {
-            parentClass.apply(this, arguments); // this has parent's properties
-            ref.apply(this, arguments); // append customer defined properties
-          };
+          CFunc.prototype = Object.create(parentClass.prototype);
+          _pfCopy(CFunc.prototype, ref.prototype);
 
-          CFunc.prototype = _pfCopy(new emptyFunc, ref.prototype);
           CFunc.prototype.constructor = CFunc;
-          CFunc.prototype.constructor.className = className;
+          CFunc.prototype.constructor.className = ref.className;
           CFunc.prototype.parentClass = parentClass;
           
           // inherit Constructor properties
           _pfCopy(CFunc, parentClass);
           _pfCopy(CFunc, ref);
 
-          space.classes[className] = freshClass = CFunc;
+          space.classes[ref.className] = freshClass = CFunc;
           return this;
         }
       });
@@ -425,14 +425,20 @@ window.TM = (function() {
       }
       if (_pConfig && _pConfig.baseUrl && src.indexOf('http') < 0) {
         src = _pConfig.baseUrl + '/' + src;
+        if (DEBUG_MODE) {
+            src += '?time=' + new Date().getTime();
+        }
       }
       
       var script = document.createElement('script');
       script.setAttribute('id', module);
       script.setAttribute('src', src);
       script.setAttribute('type', 'text/javascript');
-      //script.setAttribute('async', false);
-      //script.setAttribute('defer', false);
+      if (module === 'config') {
+          script.setAttribute('async', 'async');
+      } else {
+          script.setAttribute('defer', 'defer');
+      }
       
       if (script.addEventListener) {
         script.addEventListener('load', handleLoadEvent);
@@ -498,7 +504,7 @@ window.TM = (function() {
         loadResources();
       }
     }
-    
+
     function loadResources() {
       var readyResources = getReadyResources();      
       if (!(readyResources && readyResources.length)) {
@@ -755,13 +761,10 @@ TM.declare('thinkmvc.Base').extend({
     return  '[Class]: ' + this.getClassName()
       + '; [Functions]: ' + funcs.join(', ')
       + '; [Properties]: ' + props.join(', ');
-  },
+  }
 }).share({
   createInstance: function() {
-    var TempFunc = function() {};
-    TempFunc.prototype = this.prototype;
-
-    var instance = new TempFunc;
+    var instance = Object.create(this.prototype);
     this.apply(instance, arguments);
     return instance;
   }
