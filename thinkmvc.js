@@ -697,7 +697,7 @@ TM.declare('thinkmvc.Base').extend({
     var classPath = paths[0] || 'thinkmvc.Base', methodName = paths[1],
       method = this.U.getClass(classPath).prototype[methodName];
     if (method) {
-      method.apply(this, arguments);
+      method.apply(this, Array.prototype.slice.call(arguments, 1));
     } else {
       throw new Error('Method ' + methodPath + ' was not found.');
     }
