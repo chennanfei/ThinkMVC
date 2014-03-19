@@ -20,15 +20,9 @@ TM.declare('HomeController').inherit('thinkmvc.Controller').extend({
   }
 });
 
-TM.declare('models.User').inherit('thinkmvc.Model').extend({
-  viewPath: 'views.UserView',
-  
-  initialize: function(name) {
-    this.invoke('thinkmvc.Model:initialize');
-    this._name = name;
-  },
-  
-  retrieveDetails: function() {
+TM.declare('models.User').inherit('thinkmvc.Model').extend(function() {
+  // private methods
+  function getMessage() {
     var msg, name = this._name;
     if (!name) {
       msg = 'Please enter your name.';
@@ -39,8 +33,22 @@ TM.declare('models.User').inherit('thinkmvc.Model').extend({
         msg += ', your edu is master';
       }
     }
+    return msg;
+  }
+  
+  // public API
+  return {
+    viewPath: 'views.UserView',
     
-    this.trigger('show-details', msg);
+    initialize: function(name) {
+      this.invoke('thinkmvc.Model:initialize');
+      this._name = name;
+    },
+    
+    retrieveDetails: function() {
+      var msg = getMessage.call(this);      
+      this.trigger('show-details', msg);
+    }
   }
 });
 

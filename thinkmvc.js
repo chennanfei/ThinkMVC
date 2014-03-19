@@ -246,9 +246,13 @@ window.TM = (function() {
           if (!obj) {
             return this;
           }
+
+          if (typeof obj === 'function') {
+            obj = obj.call();
+          }
           
           if (typeof obj !== 'object') {
-            throw new Error('Passed arg should be an object');
+            throw new Error('Passed arg should be an object or a function which returns an object.');
           }
 
           _pfCopy(freshClass.prototype, obj);
@@ -632,9 +636,7 @@ window.TM = (function() {
 
   // Engine starts
   (function() {
-    setTimeout(function() {
-      _pResourceLoader.start();
-    }, 0);
+    setTimeout(function() { _pResourceLoader.start(); }, 0);
   }());
 
   return {
