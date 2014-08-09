@@ -1,7 +1,7 @@
 (function() { // resolve compatibility problems
   if (!Array.prototype.indexOf) {
     Array.prototype.indexOf = function indexOf(element) {
-      if (typeof elment === 'undefined') {
+      if (typeof element === 'undefined') {
         return -1;
       }
       for (var i = 0; i < this.length; i++) {
@@ -24,8 +24,8 @@
   }
 }());
 
-window.TM = (function() {
-  var DEBUG_MODE = false, _pDocument = typeof document !== 'undefined' ? document : null, _pCom = {},
+window.TM = (function(document, window) {
+  var DEBUG_MODE = false, _pCom = {},
     _pNamespaces = {}, _pfSlice = Array.prototype.slice, _pConfig,
     _excludedAttributes = ['_extend', '_self', 'constructor', 'U'];
 
@@ -197,10 +197,14 @@ window.TM = (function() {
           throw new Error('The class ' + className + ' was not declared.');
         }
 
-        var klass = createClass(srcFunc);
+        var klass = createClass(srcFunc), sharedObj;
         // static properties
         if (params.sharedObj) {
-          _pfCopy(klass, params.sharedObj);
+          sharedObj = params.sharedObj;
+          if (typeof sharedObj === 'function') {
+            sharedObj = sharedObj.call();
+          }
+          _pfCopy(klass, sharedObj);
         }
 
         return classes[className] = klass;
@@ -208,15 +212,14 @@ window.TM = (function() {
 
       function createClass(srcFunc) {
         if (!srcFunc) {
-          srcFunc = function() {
-          };
+          srcFunc = function() {};
         } else if (typeof srcFunc !== 'function') {
           throw new Error('Passed arg should be a function.');
         }
 
         var klass = function() {
           if ((typeof window !== 'undefined' && this === window)
-            || (typeof global !== 'undefined' && this === global)) {
+            || (typeof window.global !== 'undefined' && this === window.global)) {
             throw new Error('Please use new operator to create an object!');
           }
 
@@ -423,26 +426,25 @@ window.TM = (function() {
     }
 
     function bindDOMReady() {
-      var callback = function() {
+      var callback = function(event) {
         _pGlobalUtil.createEntrance()
       };
+
       if (isDOMReady()) {
-        if (DEBUG_MODE) {
-          _pfOutput('DOM is ready.');
-        }
-        return callback();
+        callback();
+        return;
       }
 
-      if (document.attachEvent) {
-        document.attachEvent('onreadystatechange', callback);
-        window.attachEvent('onload', callback);
-      } else if (document.addEventListener) {
+      if (document.addEventListener) {
         document.addEventListener('DOMContentLoaded', callback, false);
         window.addEventListener('load', callback, false);
-      }
-
-      if (DEBUG_MODE) {
-        _pfOutput('Events are bound for ready DOM');
+      } else if (document.attachEvent) {
+        document.attachEvent('onreadystatechange', function() {
+          if (isDOMReady()) {
+            callback();
+          }
+        });
+        window.attachEvent('onload', callback);
       }
     }
 
@@ -554,7 +556,8 @@ window.TM = (function() {
     }
 
     function isDOMReady() {
-      return document && document.body && document.readyState === 'complete';
+      var docState = document && document.body && document.readyState;
+      return docState === 'complete' || docState === 'interactive';
     }
 
     function loadResources() {
@@ -658,16 +661,14 @@ window.TM = (function() {
             scriptParent = script.parentNode;
           }
 
-          var configUrl = script.getAttribute('data-config');
-          if (!configUrl) {
+          var firstUrl = script.getAttribute('data-first');
+          if (!firstUrl) {
             return;
           }
 
-          var script = getScript('config');
-          if (script) {
-            //script.onload();
-          } else {
-            scriptParent.appendChild(createScript(configUrl, 'config'));
+          var script = getScript('first');
+          if (!script) {
+            scriptParent.appendChild(createScript(firstUrl, 'first'));
           }
           return false;
         });
@@ -690,7 +691,7 @@ window.TM = (function() {
       return _pClassRegister.declare(classPath);
     }
   };
-}()); // core thinkMVC
+}(document, window)); // core thinkMVC
 
 // super class: Base
 TM.declare('thinkmvc.Base').extend({
